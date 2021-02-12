@@ -2,6 +2,7 @@
 #
 # Copyright (C) 2019-2020 CERN.
 # Copyright (C) 2019-2020 Northwestern University.
+# Copyright (C) 2021 Graz University of Technology.
 #
 # Invenio-Records-Permissions is free software; you can redistribute it
 # and/or modify it under the terms of the MIT License; see LICENSE file for
@@ -228,6 +229,116 @@ class AllowedByAccessLevel(Generator):
         ]
 
         return reduce(operator.or_, queries)
+
+
+class IfRestricted(Generator):
+    """IfRestricted.
+
+    IfRestricted(
+    ‘metadata’,
+    RecordPermissionLevel(‘view’),
+    ActionNeed(superuser-access),
+    )
+
+    A record permission level defines an aggregated set of
+    low-level permissions,
+    that grants increasing level of permissions to a record.
+
+    We define the following four record permission levels that
+    will be selected by users in the interface:
+
+    View metadata: Allows viewing the metadata of a restrictred record.
+
+    View metadata and files:
+    Allows viewing the metadata and files of a restrictred record.
+
+    Edit: Allows editing the metadata and files of a record.
+
+    Manage: Allows managing permissions of a record.
+
+    In addition two hidden permission levels exists:
+
+    Owners: Allows adding new owners and transfering ownership of a record.
+
+    Administrators: Allows special actions like deletion of published records.
+    """
+
+    def __init__(self, func, field="files"):
+        """Constructor."""
+        self.field = field
+        self.func = lambda level: func(self, level)
+
+    def needs(self, record=None, **kwargs):
+        """Enabling Needs."""
+        if not record:
+            return []
+
+        #  files
+        is_files_restricted = (
+            record and
+            record.get('access', {}).get('files', False)
+        )
+        #  metadata
+        is_record_restricted = (
+            record and
+            record.get('access', {}).get('record', False)
+        )
+        print('is_record/metadata_restricted: ', is_record_restricted)
+        print('is_files_restricted: ', is_files_restricted)
+
+        return [any_user]
+
+    def query_filter(self, **kwargs):
+        """Filters for current identity as super user."""
+        # TODO: Implement with new permissions metadata
+        return Q('match_all')
+
+
+class RecordPermissionLevel(Generator):
+    """Permission levels.
+
+    A record permission level defines an aggregated set of
+    low-level permissions,
+    that grants increasing level of permissions to a record.
+
+    We define the following four record permission levels that
+    will be selected by users in the interface:
+
+    View metadata: Allows viewing the metadata of a restrictred record.
+
+    View metadata and files:
+    Allows viewing the metadata and files of a restrictred record.
+
+    Edit: Allows editing the metadata and files of a record.
+
+    Manage: Allows managing permissions of a record.
+
+    In addition two hidden permission levels exists:
+
+    Owners: Allows adding new owners and transfering ownership of a record.
+
+    Administrators: Allows special actions like deletion of published records.
+    """
+
+    def __init__(self, level='viewmeta'):
+        """Constructor."""
+        self.level = level
+
+    def needs(self, record=None, **kwargs):
+        """Enabling UserNeeds for each person."""
+        if not record:
+            return []
+        allowed_identities = record.get('access', {}).get('grants', [])
+
+        return [
+            UserNeed(identity.get('id')) for identity in allowed_identities
+            if identity.get('level') == self.level and identity.get('id')
+        ]
+
+    def query_filter(self, **kwargs):
+        """Filters for current identity as super user."""
+        # TODO: Implement with new permissions metadata
+        return Q('match_all')
 
 #
 # | Meta Restricted | Files Restricted | Access Right | Result |

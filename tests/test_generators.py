@@ -2,6 +2,7 @@
 #
 # Copyright (C) 2019 CERN.
 # Copyright (C) 2019 Northwestern University.
+# Copyright (C) 2021 Graz University of Technology.
 #
 # Invenio-Records-Permissions is free software; you can redistribute it
 # and/or modify it under the terms of the MIT License; see LICENSE file for
@@ -16,7 +17,8 @@ from invenio_access.permissions import any_user, authenticated_user, \
 
 from invenio_records_permissions.generators import Admin, \
     AllowedByAccessLevel, AnyUser, AnyUserIfPublic, AuthenticatedUser, \
-    Disable, Generator, RecordOwners, SuperUser
+    Disable, Generator, IfRestricted, RecordOwners, RecordPermissionLevel, \
+    SuperUser
 
 
 def test_generator():
@@ -175,3 +177,62 @@ def test_allowedbyaccesslevels_query_filter(mocker):
     )
 
     assert query_filter == []
+
+
+@pytest.mark.parametrize("field", ['metadata', 'files'])
+def test_ifrestricted(field, create_record):
+    # Restricted record, only viewable by owner and a grants level
+    record = create_record(
+        {
+            "access": {
+                "owned_by": [{"user": 4}],
+                "record": False,  # currently a boolean public|restricted"
+                "files": True,   # currently a boolean public|restricted"
+                "grants": [
+                    {"subject": "user", "id": 1, "level": "edit"},
+                    # {"subject": "user", "id": 2, "level": "manage"},
+                    # {"subject": "user", "id": 3, "level": "viewmeta"},
+                    # {"subject": "user", "id": 3, "level": "viewfull"},
+                    # {"subject": "role", "id": "curator", "level": "edit"},
+                    # {"subject": "sysrole", "id": "authenticated_user",\
+                    # "level": "view"}
+                    ]
+                }
+        }
+    )
+    generator = IfRestricted(field=field, func=RecordPermissionLevel('edit'))
+    assert generator.needs(record=record) == [any_user]
+
+    assert generator.excludes(record=record) == []
+    assert generator.query_filter().to_dict() == {'match_all': {}}
+
+
+@pytest.mark.parametrize("level", ['edit', 'manage', 'viewmeta', 'viewfull'])
+def test_recordpermissionlevel(level, create_record):
+    # Restricted record, only viewable by owner and a grants level
+    record = create_record(
+        {
+            "access": {
+                "owned_by": [{"user": 4}],
+                "record": True,  # currently a boolean public|restricted"
+                "files": True,   # currently a boolean public|restricted"
+                "grants": [
+                    {"subject": "user", "id": 1, "level": "edit"},
+                    # {"subject": "user", "id": 2, "level": "manage"},
+                    # {"subject": "user", "id": 3, "level": "viewmeta"},
+                    # {"subject": "user", "id": 3, "level": "viewfull"},
+                    # {"subject": "role", "id": "curator", "level": "edit"},
+                    # {"subject": "sysrole", "id": "authenticated_user",\
+                    #  "level": "view"}
+                    ]
+                }
+        }
+    )
+    generator = RecordPermissionLevel(level=level)
+    if level in ['edit']:
+        assert generator.needs(record=record) == [UserNeed(1)]
+    else:
+        assert generator.needs(record=record) == []
+
+    assert generator.excludes(record=record) == []
+    assert generator.query_filter().to_dict() == {'match_all': {}}
