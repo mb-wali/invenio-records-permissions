@@ -244,23 +244,6 @@ class IfRestricted(Generator):
     low-level permissions,
     that grants increasing level of permissions to a record.
 
-    We define the following four record permission levels that
-    will be selected by users in the interface:
-
-    View metadata: Allows viewing the metadata of a restrictred record.
-
-    View metadata and files:
-    Allows viewing the metadata and files of a restrictred record.
-
-    Edit: Allows editing the metadata and files of a record.
-
-    Manage: Allows managing permissions of a record.
-
-    In addition two hidden permission levels exists:
-
-    Owners: Allows adding new owners and transfering ownership of a record.
-
-    Administrators: Allows special actions like deletion of published records.
     """
 
     def __init__(self, func, field="files"):
@@ -328,10 +311,11 @@ class RecordPermissionLevel(Generator):
         """Enabling UserNeeds for each person."""
         if not record:
             return []
-        allowed_identities = record.get('access', {}).get('grants', [])
+
+        grants = record.get('access', {}).get('grants', [])
 
         return [
-            UserNeed(identity.get('id')) for identity in allowed_identities
+            UserNeed(identity.get('id')) for identity in grants
             if identity.get('level') == self.level and identity.get('id')
         ]
 
