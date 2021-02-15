@@ -14,9 +14,9 @@ import json
 import operator
 from functools import reduce
 from itertools import chain
-from flask_principal import ActionNeed, Need
+
 from elasticsearch_dsl.query import Q
-from flask_principal import ActionNeed, UserNeed
+from flask_principal import ActionNeed, Need, UserNeed
 from invenio_access.permissions import any_user, authenticated_user, \
     superuser_access
 from invenio_records.api import Record
@@ -245,50 +245,29 @@ class IfRestricted(Generator):
     that grants increasing level of permissions to a record.
 
     """
-    # restricted_needs - always
-    # public_needs - else statement
 
-    def __init__(self, action, *args):
+    def __init__(self, field, _then, _else):
         """Constructor."""
-        self.action = action
-        self.args = args
+        self.field = field
+        self._then = _then
+        self._else = _else
 
     def needs(self, record=None, **kwargs):
         """Enabling Needs."""
         if not record:
             return []
 
-        needs = []
-        if self.args:
-            for need in set(chain.from_iterable(self.args)):
-                needs.append(need.__getattribute__('needs')())
-        
-        # if needs:
-        #     print('final', needs)
-        #     for n in needs:
-        #         pass
-
-        #  files  - is_files_restricted - let the user choose what to return
-        is_files_restricted = (
+        is_field_restricted = (
             record and
-            record.get('access', {}).get('files', False)
+            record.get('access', {}).get(self.field, "restricted")
         )
-        #  metadata
-        is_record_restricted = (
-            record and
-            record.get('access', {}).get('record', False)
-        )
-        # print('is_record/metadata_restricted: ', is_record_restricted)
-        # print('is_files_restricted: ', is_files_restricted)
 
-        if self.action == "files" and is_files_restricted:
-            print('user wants files', needs[1])
-            return needs[0]
-        elif self.action == "metadata" and is_record_restricted:
-            print('metadata - records are restricted')
-            return needs[0]
+        if is_field_restricted == "restricted":
+            return getattr(self._then[0], 'needs')()
+        else:
+            return getattr(self._else[0], 'needs')()
 
-        # return []
+        return [any_user]
 
     def query_filter(self, **kwargs):
         """Filters for current identity as super user."""

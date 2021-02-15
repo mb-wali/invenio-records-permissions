@@ -178,35 +178,24 @@ def test_allowedbyaccesslevels_query_filter(mocker):
     assert query_filter == []
 
 
-@pytest.mark.parametrize("field", ['files'])
+@pytest.mark.parametrize("field", ['record', 'files'])
+
 def test_ifrestricted(field, create_record):
     # Restricted record, only viewable by owner and a grants level
     record = create_record(
         {
             "access": {
                 "owned_by": [{"user": 4}],
-                "record": False,  # currently a boolean public|restricted"
-                "files": True,   # currently a boolean public|restricted"
+                "record": "restricted",  # currently a boolean public|restricted"
+                "files": "restricted",   # currently a boolean public|restricted"
                 "grants": [
                     {"subject": "user", "id": 1, "level": "edit"},
-                    # {"subject": "user", "id": 2, "level": "manage"},
-                    # {"subject": "user", "id": 3, "level": "viewmeta"},
-                    # {"subject": "user", "id": 3, "level": "viewfull"},
-                    # {"subject": "role", "id": "curator", "level": "edit"},
-                    # {"subject": "sysrole", "id": "authenticated_user",\
-                    # "level": "view"}
                     ]
                 }
         }
     )
-    generator = IfRestricted('files', [AuthenticatedUser()], [AnyUser()])
-    # if field in ['metadata']:
-    #     print('filed in metadata')
-    #     assert generator.needs(record=record) == [any_user]
-    # if field in ['files']:
-    #     print('filed in files', field)
-    #     assert generator.needs(record=record) == [authenticated_user]
 
+    generator = IfRestricted('files', _then=[AuthenticatedUser()], _else=[AnyUser()])
     assert generator.needs(record=record) == [authenticated_user]
 
     assert generator.excludes(record=record) == []
