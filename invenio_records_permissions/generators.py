@@ -14,7 +14,7 @@ import json
 import operator
 from functools import reduce
 from itertools import chain
-
+from flask_principal import ActionNeed, Need
 from elasticsearch_dsl.query import Q
 from flask_principal import ActionNeed, UserNeed
 from invenio_access.permissions import any_user, authenticated_user, \
@@ -245,18 +245,30 @@ class IfRestricted(Generator):
     that grants increasing level of permissions to a record.
 
     """
+    # restricted_needs - always
+    # public_needs - else statement
 
-    def __init__(self, func, field="files"):
+    def __init__(self, action, *args):
         """Constructor."""
-        self.field = field
-        self.func = lambda level: func(self, level)
+        self.action = action
+        self.args = args
 
     def needs(self, record=None, **kwargs):
         """Enabling Needs."""
         if not record:
             return []
 
-        #  files
+        needs = []
+        if self.args:
+            for need in set(chain.from_iterable(self.args)):
+                needs.append(need.__getattribute__('needs')())
+        
+        # if needs:
+        #     print('final', needs)
+        #     for n in needs:
+        #         pass
+
+        #  files  - is_files_restricted - let the user choose what to return
         is_files_restricted = (
             record and
             record.get('access', {}).get('files', False)
@@ -266,63 +278,70 @@ class IfRestricted(Generator):
             record and
             record.get('access', {}).get('record', False)
         )
-        print('is_record/metadata_restricted: ', is_record_restricted)
-        print('is_files_restricted: ', is_files_restricted)
+        # print('is_record/metadata_restricted: ', is_record_restricted)
+        # print('is_files_restricted: ', is_files_restricted)
 
-        return [any_user]
+        if self.action == "files" and is_files_restricted:
+            print('user wants files', needs[1])
+            return needs[0]
+        elif self.action == "metadata" and is_record_restricted:
+            print('metadata - records are restricted')
+            return needs[0]
 
-    def query_filter(self, **kwargs):
-        """Filters for current identity as super user."""
-        # TODO: Implement with new permissions metadata
-        return Q('match_all')
-
-
-class RecordPermissionLevel(Generator):
-    """Permission levels.
-
-    A record permission level defines an aggregated set of
-    low-level permissions,
-    that grants increasing level of permissions to a record.
-
-    We define the following four record permission levels that
-    will be selected by users in the interface:
-
-    View metadata: Allows viewing the metadata of a restrictred record.
-
-    View metadata and files:
-    Allows viewing the metadata and files of a restrictred record.
-
-    Edit: Allows editing the metadata and files of a record.
-
-    Manage: Allows managing permissions of a record.
-
-    In addition two hidden permission levels exists:
-
-    Owners: Allows adding new owners and transfering ownership of a record.
-
-    Administrators: Allows special actions like deletion of published records.
-    """
-
-    def __init__(self, level='viewmeta'):
-        """Constructor."""
-        self.level = level
-
-    def needs(self, record=None, **kwargs):
-        """Enabling UserNeeds for each person."""
-        if not record:
-            return []
-
-        grants = record.get('access', {}).get('grants', [])
-
-        return [
-            UserNeed(identity.get('id')) for identity in grants
-            if identity.get('level') == self.level and identity.get('id')
-        ]
+        # return []
 
     def query_filter(self, **kwargs):
         """Filters for current identity as super user."""
         # TODO: Implement with new permissions metadata
         return Q('match_all')
+
+
+# class RecordPermissionLevel(Generator):
+#     """Permission levels.
+
+#     A record permission level defines an aggregated set of
+#     low-level permissions,
+#     that grants increasing level of permissions to a record.
+
+#     We define the following four record permission levels that
+#     will be selected by users in the interface:
+
+#     View metadata: Allows viewing the metadata of a restrictred record.
+
+#     View metadata and files:
+#     Allows viewing the metadata and files of a restrictred record.
+
+#     Edit: Allows editing the metadata and files of a record.
+
+#     Manage: Allows managing permissions of a record.
+
+#     In addition two hidden permission levels exists:
+
+#     Owners: Allows adding new owners and transfering ownership of a record.
+
+#     Administrators: Allows special actions like deletion of published records.
+#     """
+
+#     def __init__(self, level='viewmeta'):
+#         """Constructor."""
+#         self.level = level
+
+#     def needs(self, record=None, **kwargs):
+#         """Enabling UserNeeds for each person."""
+#         if not record:
+#             return []
+
+#         grants = record.get('access', {}).get('grants', [])
+
+#         return [
+#             UserNeed(identity.get('id')) for identity in grants
+#             if identity.get('level') == self.level and identity.get('id')
+#         ]
+
+#     def query_filter(self, **kwargs):
+#         """Filters for current identity as super user."""
+#         # TODO: Implement with new permissions metadata
+#         return Q('match_all')
 
 #
 # | Meta Restricted | Files Restricted | Access Right | Result |

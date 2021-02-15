@@ -17,8 +17,7 @@ from invenio_access.permissions import any_user, authenticated_user, \
 
 from invenio_records_permissions.generators import Admin, \
     AllowedByAccessLevel, AnyUser, AnyUserIfPublic, AuthenticatedUser, \
-    Disable, Generator, IfRestricted, RecordOwners, RecordPermissionLevel, \
-    SuperUser
+    Disable, Generator, IfRestricted, RecordOwners, SuperUser
 
 
 def test_generator():
@@ -179,7 +178,7 @@ def test_allowedbyaccesslevels_query_filter(mocker):
     assert query_filter == []
 
 
-@pytest.mark.parametrize("field", ['metadata', 'files'])
+@pytest.mark.parametrize("field", ['files'])
 def test_ifrestricted(field, create_record):
     # Restricted record, only viewable by owner and a grants level
     record = create_record(
@@ -200,39 +199,46 @@ def test_ifrestricted(field, create_record):
                 }
         }
     )
-    generator = IfRestricted(field=field, func=RecordPermissionLevel('edit'))
-    assert generator.needs(record=record) == [any_user]
+    generator = IfRestricted('files', [AuthenticatedUser()], [AnyUser()])
+    # if field in ['metadata']:
+    #     print('filed in metadata')
+    #     assert generator.needs(record=record) == [any_user]
+    # if field in ['files']:
+    #     print('filed in files', field)
+    #     assert generator.needs(record=record) == [authenticated_user]
+
+    assert generator.needs(record=record) == [authenticated_user]
 
     assert generator.excludes(record=record) == []
     assert generator.query_filter().to_dict() == {'match_all': {}}
 
 
-@pytest.mark.parametrize("level", ['edit', 'manage', 'viewmeta', 'viewfull'])
-def test_recordpermissionlevel(level, create_record):
-    # Restricted record, only viewable by owner and a grants level
-    record = create_record(
-        {
-            "access": {
-                "owned_by": [{"user": 4}],
-                "record": True,  # currently a boolean public|restricted"
-                "files": True,   # currently a boolean public|restricted"
-                "grants": [
-                    {"subject": "user", "id": 1, "level": "edit"},
-                    # {"subject": "user", "id": 2, "level": "manage"},
-                    # {"subject": "user", "id": 3, "level": "viewmeta"},
-                    # {"subject": "user", "id": 3, "level": "viewfull"},
-                    # {"subject": "role", "id": "curator", "level": "edit"},
-                    # {"subject": "sysrole", "id": "authenticated_user",\
-                    #  "level": "view"}
-                    ]
-                }
-        }
-    )
-    generator = RecordPermissionLevel(level=level)
-    if level in ['edit']:
-        assert generator.needs(record=record) == [UserNeed(1)]
-    else:
-        assert generator.needs(record=record) == []
+# @pytest.mark.parametrize("level", ['edit', 'manage', 'viewmeta', 'viewfull'])
+# def test_recordpermissionlevel(level, create_record):
+#     # Restricted record, only viewable by owner and a grants level
+#     record = create_record(
+#         {
+#             "access": {
+#                 "owned_by": [{"user": 4}],
+#                 "record": True,  # currently a boolean public|restricted"
+#                 "files": True,   # currently a boolean public|restricted"
+#                 "grants": [
+#                     {"subject": "user", "id": 1, "level": "edit"},
+#                     # {"subject": "user", "id": 2, "level": "manage"},
+#                     # {"subject": "user", "id": 3, "level": "viewmeta"},
+#                     # {"subject": "user", "id": 3, "level": "viewfull"},
+#                     # {"subject": "role", "id": "curator", "level": "edit"},
+#                     # {"subject": "sysrole", "id": "authenticated_user",\
+#                     #  "level": "view"}
+#                     ]
+#                 }
+#         }
+#     )
+#     generator = RecordPermissionLevel(level=level)
+#     if level in ['edit']:
+#         assert generator.needs(record=record) == [UserNeed(1)]
+#     else:
+#         assert generator.needs(record=record) == []
 
-    assert generator.excludes(record=record) == []
-    assert generator.query_filter().to_dict() == {'match_all': {}}
+#     assert generator.excludes(record=record) == []
+#     assert generator.query_filter().to_dict() == {'match_all': {}}
