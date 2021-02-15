@@ -2,6 +2,7 @@
 #
 # Copyright (C) 2019 CERN.
 # Copyright (C) 2019 Northwestern University.
+# Copyright (C) 2021 Graz University of Technology.
 #
 # Invenio-Records-Permissions is free software; you can redistribute it
 # and/or modify it under the terms of the MIT License; see LICENSE file for
@@ -16,7 +17,7 @@ from invenio_access.permissions import any_user, authenticated_user, \
 
 from invenio_records_permissions.generators import Admin, \
     AllowedByAccessLevel, AnyUser, AnyUserIfPublic, AuthenticatedUser, \
-    Disable, Generator, RecordOwners, SuperUser
+    Disable, Generator, IfRestricted, RecordOwners, SuperUser
 
 
 def test_generator():
@@ -175,3 +176,25 @@ def test_allowedbyaccesslevels_query_filter(mocker):
     )
 
     assert query_filter == []
+
+
+@pytest.mark.parametrize("field", ['files'])
+def test_ifrestricted(field, create_record):
+    # Restricted files, permission level = then_
+    record = create_record(
+        {
+            "access": {
+                "owned_by": [{"user": 4}],
+                "record": "public",
+                "files": "restricted",
+                "grants": [
+                    {"subject": "user", "id": 1, "level": "edit"},
+                    ]
+                }
+        }
+    )
+
+    generator = IfRestricted(field=field,
+                             then_=[AuthenticatedUser()], else_=[AnyUser()])
+    assert generator.needs(record=record) == [authenticated_user]
+    assert generator.query_filter().to_dict() == {'match_all': {}}

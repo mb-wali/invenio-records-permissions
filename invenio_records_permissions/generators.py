@@ -2,6 +2,7 @@
 #
 # Copyright (C) 2019-2020 CERN.
 # Copyright (C) 2019-2020 Northwestern University.
+# Copyright (C) 2021 Graz University of Technology.
 #
 # Invenio-Records-Permissions is free software; you can redistribute it
 # and/or modify it under the terms of the MIT License; see LICENSE file for
@@ -228,6 +229,50 @@ class AllowedByAccessLevel(Generator):
         ]
 
         return reduce(operator.or_, queries)
+
+
+class IfRestricted(Generator):
+    """IfRestricted.
+
+    IfRestricted(
+    ‘metadata’,
+    RecordPermissionLevel(‘view’),
+    ActionNeed(superuser-access),
+    )
+
+    A record permission level defines an aggregated set of
+    low-level permissions,
+    that grants increasing level of permissions to a record.
+
+    """
+
+    def __init__(self, field, then_, else_):
+        """Constructor."""
+        self.field = field
+        self.then_ = then_
+        self.else_ = else_
+
+    def needs(self, record=None, **kwargs):
+        """Enabling Needs."""
+        if not record:
+            return []
+
+        is_field_restricted = (
+            record and
+            record.get('access', {}).get(self.field, "restricted")
+        )
+
+        if is_field_restricted == "restricted":
+            return getattr(self.then_[0], 'needs')()
+        else:
+            return getattr(self.else_[0], 'needs')()
+
+        return []
+
+    def query_filter(self, **kwargs):
+        """Filters for current identity as super user."""
+        # TODO: Implement with new permissions metadata
+        return Q('match_all')
 
 #
 # | Meta Restricted | Files Restricted | Access Right | Result |
