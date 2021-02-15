@@ -178,16 +178,15 @@ def test_allowedbyaccesslevels_query_filter(mocker):
     assert query_filter == []
 
 
-@pytest.mark.parametrize("field", ['record', 'files'])
-
-def test_ifrestricted(field, create_record):
+@pytest.mark.parametrize("field", ['record'])
+def test_ifrestricted_record(field, create_record):
     # Restricted record, only viewable by owner and a grants level
     record = create_record(
         {
             "access": {
                 "owned_by": [{"user": 4}],
-                "record": "restricted",  # currently a boolean public|restricted"
-                "files": "restricted",   # currently a boolean public|restricted"
+                "record": "public",
+                "files": "restricted",
                 "grants": [
                     {"subject": "user", "id": 1, "level": "edit"},
                     ]
@@ -195,11 +194,59 @@ def test_ifrestricted(field, create_record):
         }
     )
 
-    generator = IfRestricted('files', _then=[AuthenticatedUser()], _else=[AnyUser()])
+    generator = IfRestricted(field=field, then_=[AuthenticatedUser()], else_=[AnyUser()])
+    assert generator.needs(record=record) == [any_user]
+
+    assert generator.excludes(record=record) == []
+    assert generator.query_filter().to_dict() == {'match_all': {}}
+
+
+@pytest.mark.parametrize("field", ['files'])
+def test_ifrestricted_files(field, create_record):
+    # Restricted record, only viewable by owner and a grants level
+    record = create_record(
+        {
+            "access": {
+                "owned_by": [{"user": 4}],
+                "record": "restricted",
+                "files": "restricted",
+                "grants": [
+                    {"subject": "user", "id": 1, "level": "edit"},
+                    ]
+                }
+        }
+    )
+
+    generator = IfRestricted(field=field, then_=[AuthenticatedUser()], else_=[AnyUser()])
     assert generator.needs(record=record) == [authenticated_user]
 
     assert generator.excludes(record=record) == []
     assert generator.query_filter().to_dict() == {'match_all': {}}
+
+@pytest.mark.parametrize("field", ['files', 'record'])
+def test_ifrestricted_public(field, create_record):
+    # Restricted record, only viewable by owner and a grants level
+    record = create_record(
+        {
+            "access": {
+                "owned_by": [{"user": 4}],
+                "record": "public",
+                "files": "public",
+                "grants": [
+                    {"subject": "user", "id": 1, "level": "edit"},
+                    ]
+                }
+        }
+    )
+
+    generator = IfRestricted(field=field, then_=[AuthenticatedUser()], else_=[AnyUser()])
+    assert generator.needs(record=record) == [any_user]
+
+    assert generator.excludes(record=record) == []
+    assert generator.query_filter().to_dict() == {'match_all': {}}
+
+
+
 
 
 # @pytest.mark.parametrize("level", ['edit', 'manage', 'viewmeta', 'viewfull'])

@@ -246,11 +246,11 @@ class IfRestricted(Generator):
 
     """
 
-    def __init__(self, field, _then, _else):
+    def __init__(self, field, then_, else_):
         """Constructor."""
         self.field = field
-        self._then = _then
-        self._else = _else
+        self.then_ = then_
+        self.else_ = else_
 
     def needs(self, record=None, **kwargs):
         """Enabling Needs."""
@@ -263,11 +263,11 @@ class IfRestricted(Generator):
         )
 
         if is_field_restricted == "restricted":
-            return getattr(self._then[0], 'needs')()
+            return getattr(self.then_[0], 'needs')()
         else:
-            return getattr(self._else[0], 'needs')()
+            return getattr(self.else_[0], 'needs')()
 
-        return [any_user]
+        return []
 
     def query_filter(self, **kwargs):
         """Filters for current identity as super user."""
