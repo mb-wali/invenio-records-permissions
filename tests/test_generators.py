@@ -10,13 +10,13 @@
 import copy
 
 import pytest
-from flask_principal import ActionNeed, UserNeed
+from flask_principal import ActionNeed, UserNeed, RoleNeed
 from invenio_access.permissions import any_user, authenticated_user, \
     superuser_access
 
 from invenio_records_permissions.generators import Admin, \
     AllowedByAccessLevel, AnyUser, AnyUserIfPublic, AuthenticatedUser, \
-    Disable, Generator, RecordOwners, SuperUser
+    Disable, Generator, RecordOwners, RecordPermissionLevel, SuperUser
 
 
 def test_generator():
@@ -175,3 +175,40 @@ def test_allowedbyaccesslevels_query_filter(mocker):
     )
 
     assert query_filter == []
+
+
+@pytest.mark.parametrize("level", ['edit', 'manage', 'viewmeta', 'viewfull'])
+def test_recordpermissionlevel(level, create_record):
+    # Restricted record, only viewable by owner and a grants level
+    record = create_record(
+        {
+            "access": {
+                "owned_by": [{"user": 4}],
+                "record": "restricted",
+                "files": "restricted",
+                "grants": [
+                    {"subject": "user", "id": 1, "level": "edit"},
+                    {"subject": "user", "id": 2, "level": "manage"},
+                    # {"subject": "user", "id": 3, "level": "viewmeta"},
+                    # {"subject": "user", "id": 3, "level": "viewfull"},
+                    {"subject": "role", "id": "curator", "level": "manage"},
+                    # {"subject": "sysrole", "id": "authenticated_user",\
+                    #  "level": "view"}
+                    ]
+                }
+        }
+    )
+    generator = RecordPermissionLevel(level=level)
+    if level in ['edit']:
+        assert generator.needs(record=record) == [UserNeed(2)]
+    else:
+        assert generator.needs(record=record) == []
+
+    assert generator.excludes(record=record) == []
+    assert generator.query_filter().to_dict() == {'match_all': {}}
+
+
+# (acccess.record:public AND ....) OR (acccess.record:restricted AND ....)
+
+# combined - Q 
+# https://elasticsearch-dsl.readthedocs.io/en/latest/search_dsl.html#queries

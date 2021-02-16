@@ -15,7 +15,7 @@ from functools import reduce
 from itertools import chain
 
 from elasticsearch_dsl.query import Q
-from flask_principal import ActionNeed, UserNeed
+from flask_principal import ActionNeed, UserNeed, RoleNeed
 from invenio_access.permissions import any_user, authenticated_user, \
     superuser_access
 from invenio_records.api import Record
@@ -229,7 +229,75 @@ class AllowedByAccessLevel(Generator):
 
         return reduce(operator.or_, queries)
 
-#
+
+class RecordPermissionLevel(Generator):
+    """Permission levels.
+
+    A record permission level defines an aggregated set of
+    low-level permissions,
+    that grants increasing level of permissions to a record.
+
+    We define the following four record permission levels that
+    will be selected by users in the interface:
+
+    View metadata: Allows viewing the metadata of a restrictred record.
+
+    View metadata and files:
+    Allows viewing the metadata and files of a restrictred record.
+
+    Edit: Allows editing the metadata and files of a record.
+
+    Manage: Allows managing permissions of a record.
+
+    In addition two hidden permission levels exists:
+
+    Owners: Allows adding new owners and transfering ownership of a record.
+
+    Administrators: Allows special actions like deletion of published records.
+    """
+
+    def __init__(self, level='viewmeta'):
+        """Constructor."""
+        self.level = level
+        print('level', self.level)
+
+    def needs(self, record=None, **kwargs):
+        """Enabling UserNeeds for each person."""
+        if not record:
+            return []
+
+        # list of grants
+        grants = record.get('access', {}).get('grants', [])
+        print('grants', grants)
+        # print('dict', grants.get(self.level))
+
+        # gets 
+        for sub in grants:
+            if sub['level'] == self.level:
+                print('ffff', sub)
+                break
+
+        # for identity in grants:
+        #     print('each identity...',identity)
+        #     print('each identity...',identity.get('id'))
+        #     print('each identity...',identity.get('level'))
+        #     print('each identity...',identity.get('subject'))
+            # if subject == "user"  return UserNeed()
+            # if subject == "role"  return RoleNeed()
+
+
+        return [
+            UserNeed(identity.get('id')) for identity in grants
+            if identity.get('level') == self.level and identity.get('id')
+        ]
+
+    def query_filter(self, **kwargs):
+        """Filters for current identity as super user."""
+        # TODO: Implement with new permissions metadata
+        return Q('match_all')
+
+## query in reverse - else restricted
+
 # | Meta Restricted | Files Restricted | Access Right | Result |
 # |-----------------|------------------|--------------|--------|
 # |       True      |       True       |   Not Open   |  False |
